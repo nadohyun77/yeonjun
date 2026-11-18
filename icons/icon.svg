@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="0.55" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#db2777"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- 게임패드 -->
+  <path d="M150 170h212c56 0 92 52 100 120l8 64c6 46-42 72-74 40l-46-46H162l-46 46c-32 32-80 6-74-40l8-64c8-68 44-120 100-120z" fill="#fff"/>
+  <!-- 십자 버튼 -->
+  <rect x="134" y="236" width="88" height="28" rx="8" fill="#7c3aed"/>
+  <rect x="164" y="206" width="28" height="88" rx="8" fill="#7c3aed"/>
+  <!-- 버튼 -->
+  <circle cx="340" cy="222" r="20" fill="#f43f5e"/>
+  <circle cx="380" cy="262" r="20" fill="#22c55e"/>
+  <circle cx="300" cy="262" r="20" fill="#0ea5e9"/>
+  <circle cx="340" cy="302" r="20" fill="#f59e0b"/>
+</svg>
