@@ -288,6 +288,46 @@
     });
   }
 
+  // ---------- 전체 화면 ----------
+  const docEl = document.documentElement;
+  const fsSupported = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function toggleFullscreen() {
+    try {
+      if (isFullscreen()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+        const p = req.call(docEl, { navigationUI: 'hide' });
+        if (p && p.catch) p.catch(() => { /* 브라우저가 거부하면 무시 */ });
+      }
+    } catch (e) { /* 무시 */ }
+  }
+
+  function updateFullscreenButtons() {
+    const on = isFullscreen();
+    document.querySelectorAll('.fs-btn').forEach((b) => {
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-label', on ? '전체 화면 끝내기' : '전체 화면');
+    });
+  }
+
+  function setupFullscreen() {
+    // 이미 홈 화면 앱(전체 화면)으로 실행 중이거나 지원하지 않는 브라우저면 버튼 숨김
+    const standalone = window.matchMedia && window.matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+    document.querySelectorAll('.fs-btn').forEach((b) => {
+      if (!fsSupported || standalone) { b.hidden = true; return; }
+      b.addEventListener('click', () => { sound('tap'); toggleFullscreen(); });
+    });
+    document.addEventListener('fullscreenchange', updateFullscreenButtons);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButtons);
+    updateFullscreenButtons();
+  }
+
   function updateSoundButton() {
     el.soundBtn.textContent = soundOn ? '🔊' : '🔇';
   }
@@ -323,6 +363,7 @@
     document.addEventListener('contextmenu', (e) => e.preventDefault());
 
     updateSoundButton();
+    setupFullscreen();
     renderHome();
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
