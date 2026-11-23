@@ -7,6 +7,25 @@ registerGame({
   howTo: '글자의 뜻이 아니라\n글자가 칠해진 "색깔"을 골라요.\n30초 동안 최대한 많이!\n틀리면 2초가 줄어들어요.',
   best: 'high',
   format: (n) => n + '점',
+  // 통통 튀는 펑키한 곡
+  music: {
+    bpm: 128,
+    lead: 'square',
+    melody: [
+      79, null, 79, 81, 83, null, 79, null,
+      76, null, 76, 79, 83, null, 79, 76,
+      76, 79, 84, null, 83, 81, 79, null,
+      81, null, 78, null, 74, null, null, null,
+      83, 81, 79, null, 83, 81, 79, null,
+      76, 79, 83, 86, 83, 79, 76, null,
+      72, 76, 79, 84, 81, 79, 76, 79,
+      78, null, 74, 78, 79, null, null, null,
+    ],
+    roots: [43, 40, 48, 50, 43, 40, 48, 50],
+    bass: [0, null, 0, 12, null, 0, 12, null],
+    drums: 'k.s..ks.',
+    hats: true,
+  },
 
   start(api) {
     const COLORS = [
@@ -21,6 +40,8 @@ registerGame({
     let answer = -1;
     let lastKey = '';
     let running = false;
+    let streak = 0;
+    let lastWarn = 0;
 
     const wrap = document.createElement('div');
     wrap.className = 'color-wrap';
@@ -78,10 +99,12 @@ registerGame({
       next();
       if (correct) {
         score++;
-        api.sound('good');
+        streak++;
+        api.sound('combo', streak); // 연속으로 맞히면 소리가 점점 높아져요
         api.floatText('+1', fx, fy, '#bbf7d0');
       } else {
         timeLeft -= 2;
+        streak = 0;
         api.sound('bad');
         api.vibrate(60);
         api.shake(word);
@@ -96,6 +119,12 @@ registerGame({
       next();
       api.loop((dt) => {
         timeLeft -= dt;
+        const left = Math.ceil(timeLeft);
+        if (left <= 5 && left > 0 && left !== lastWarn) {
+          lastWarn = left;
+          api.sound('warn');
+          api.musicTempo(1.25);
+        }
         hud();
         if (timeLeft <= 0) {
           running = false;

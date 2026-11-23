@@ -42,7 +42,7 @@
     return audioCtx;
   }
 
-  function tone(freq, dur, type, vol, delay) {
+  function tone(freq, dur, type, vol, delay, slideTo) {
     const ac = getAudio();
     if (!ac) return;
     const t = ac.currentTime + (delay || 0);
@@ -50,6 +50,7 @@
     const gain = ac.createGain();
     osc.type = type || 'sine';
     osc.frequency.setValueAtTime(freq, t);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
     gain.gain.setValueAtTime(vol || 0.15, t);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     osc.connect(gain).connect(ac.destination);
@@ -57,19 +58,49 @@
     osc.stop(t + dur + 0.02);
   }
 
+  const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+
   const SOUNDS = {
+    // 공통
     tap: () => tone(660, 0.07, 'triangle', 0.15),
-    pop: () => tone(500 + Math.random() * 400, 0.08, 'square', 0.06),
     good: () => { tone(784, 0.09, 'triangle', 0.15); tone(1047, 0.12, 'triangle', 0.15, 0.08); },
     bad: () => tone(160, 0.2, 'sawtooth', 0.08),
     tick: () => tone(880, 0.08, 'sine', 0.12),
     go: () => tone(1320, 0.18, 'sine', 0.15),
     win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.14, i * 0.11)),
+    lose: () => [523, 494, 466, 392].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, i * 0.16)),
+    draw: () => { tone(587, 0.14, 'triangle', 0.12); tone(587, 0.2, 'triangle', 0.12, 0.16); },
+    warn: () => tone(1100, 0.06, 'square', 0.05),
+    // 풍선
+    pop: () => { tone(900 + Math.random() * 300, 0.09, 'square', 0.07, 0, 200); },
+    sparkle: () => [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.1, 'sine', 0.1, i * 0.05)),
+    escape: () => tone(420, 0.25, 'sine', 0.04, 0, 180),
+    // 짝 맞추기
+    flip: () => tone(500, 0.08, 'triangle', 0.1, 0, 950),
+    miss: () => { tone(440, 0.1, 'triangle', 0.1); tone(330, 0.16, 'triangle', 0.1, 0.1); },
+    // 숫자: n 번째 숫자마다 음이 한 칸씩 올라감
+    note: (n) => {
+      const i = n || 0;
+      tone(hz(60 + MAJOR[i % 7] + 12 * (Math.floor(i / 7) % 3)), 0.12, 'triangle', 0.15);
+    },
+    // 색깔: 연속으로 맞히면 점점 높아짐
+    combo: (n) => {
+      const base = 72 + Math.min(n || 0, 12);
+      tone(hz(base), 0.07, 'square', 0.06);
+      tone(hz(base + 7), 0.1, 'square', 0.06, 0.06);
+    },
+    // 반응속도: 빠를수록 높은 소리
+    ding: (ms) => tone(ms < 300 ? 1568 : ms < 400 ? 1175 : 880, 0.25, 'sine', 0.15),
+    // 틱택토
+    placeO: () => { tone(523, 0.08, 'triangle', 0.15); tone(784, 0.12, 'triangle', 0.13, 0.06); },
+    placeX: () => { tone(392, 0.08, 'square', 0.07); tone(294, 0.12, 'square', 0.07, 0.06); },
+    think: () => { tone(660, 0.05, 'sine', 0.07); tone(880, 0.05, 'sine', 0.07, 0.12); },
   };
 
-  function sound(name) {
+  function sound(name, arg) {
     if (!soundOn || !SOUNDS[name]) return;
-    try { SOUNDS[name](); } catch (e) { /* 무시 */ }
+    try { SOUNDS[name](arg); } catch (e) { /* 무시 */ }
   }
 
   function vibrate(pattern) {
@@ -97,6 +128,7 @@
       drums: 'k.s.k.s.',
       hats: true,
     },
+    // 게임이 따로 곡을 정하지 않았을 때 쓰는 기본 곡
     game: {
       bpm: 150,
       lead: 'square',
@@ -119,8 +151,9 @@
 
   const music = {
     on: store.get('music', true),
-    want: null, // 'menu' | 'game'
+    want: null, // 재생할 곡 (곡 객체)
     track: null,
+    tempo: 1, // 1보다 크면 빨라짐
     gain: null,
     noise: null,
     timer: null,
@@ -186,10 +219,11 @@
 
   function scheduleStep(ac, out, tr, i, t, eighth) {
     const note = tr.melody[i % tr.melody.length];
-    if (note !== null) synthNote(ac, out, midiHz(note), t, eighth * 0.9, tr.lead, tr.lead === 'square' ? 0.035 : 0.07);
+    const lv = tr.vol || 1;
+    if (note !== null) synthNote(ac, out, midiHz(note), t, eighth * 0.9, tr.lead, (tr.lead === 'square' ? 0.035 : 0.07) * lv);
     const bar = Math.floor(i / 8) % tr.roots.length;
     const b = tr.bass[i % 8];
-    if (b !== null) synthNote(ac, out, midiHz(tr.roots[bar] + b), t, eighth * 0.8, 'triangle', 0.12);
+    if (b !== null) synthNote(ac, out, midiHz(tr.roots[bar] + b), t, eighth * 0.8, 'triangle', 0.12 * lv);
     const d = tr.drums[i % 8];
     if (d !== '.') drum(ac, out, d, t);
     if (tr.hats) drum(ac, out, 'h', t + eighth / 2);
@@ -198,8 +232,8 @@
   function musicTick() {
     const ac = audioCtx;
     if (!ac || ac.state !== 'running' || !music.track) return;
-    const tr = TRACKS[music.track];
-    const eighth = 60 / tr.bpm / 2;
+    const tr = music.track;
+    const eighth = 60 / (tr.bpm * music.tempo) / 2;
     const out = musicOut(ac);
     if (music.nextTime < ac.currentTime) music.nextTime = ac.currentTime + 0.05;
     while (music.nextTime < ac.currentTime + 0.25) {
@@ -209,9 +243,10 @@
     }
   }
 
-  /** 원하는 곡을 정하고, 소리를 낼 수 있으면 바로 재생 */
-  function playMusic(name) {
-    music.want = name;
+  /** 원하는 곡(이름 또는 곡 객체)을 정하고, 소리를 낼 수 있으면 바로 재생 */
+  function playMusic(trackOrName) {
+    music.want = typeof trackOrName === 'string' ? TRACKS[trackOrName] : trackOrName;
+    music.tempo = 1;
     syncMusic();
   }
 
@@ -279,6 +314,8 @@
       sound,
       vibrate,
       shuffle,
+      /** 배경음악 빠르기 (1 = 보통, 1.25 = 빠르게) */
+      musicTempo(x) { if (s.alive) music.tempo = x; },
       /** 상단 오른쪽 정보 표시 (시간, 점수 등) */
       info(text) { if (s.alive) el.hudInfo.textContent = text; },
       /** 게임이 끝나면 자동으로 정리되는 setTimeout */
@@ -365,7 +402,7 @@
     stage.className = 'stage stage-' + game.id;
     el.stageWrap.appendChild(stage);
     session = { alive: true, timeouts: new Set(), intervals: new Set(), stage };
-    playMusic('game');
+    playMusic(game.music || 'game');
     game.start(makeApi(game, session));
   }
 
@@ -388,7 +425,7 @@
       }
     }
 
-    sound(isNew ? 'win' : 'good');
+    sound(result.sound || (isNew ? 'win' : 'good'));
     if (isNew) vibrate([40, 60, 40]);
 
     showOverlay({

@@ -1,6 +1,6 @@
 // 오프라인에서도 게임을 할 수 있도록 파일을 저장해 둡니다.
 // 게임 파일을 바꾸면 CACHE 버전을 올려 주세요.
-const CACHE = 'minigames-v4';
+const CACHE = 'minigames-v5';
 const ASSETS = [
   './',
   'index.html',

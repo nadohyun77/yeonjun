@@ -51,6 +51,25 @@
     desc: '친구나 컴퓨터와 한 판!',
     howTo: '가로, 세로, 대각선으로\n같은 모양 3개를 먼저 놓으면 이겨요.\n둘이서 하거나 컴퓨터와 할 수 있어요.',
     best: null,
+    // 느긋하고 즐거운 곡
+    music: {
+      bpm: 108,
+      lead: 'triangle',
+      melody: [
+        76, null, 74, 72, 74, null, 76, null,
+        72, null, 69, null, 72, null, 76, null,
+        74, null, 77, null, 76, null, 74, null,
+        71, null, 67, null, null, null, null, null,
+        76, null, 79, null, 81, null, 79, 76,
+        76, null, 72, null, 69, null, 72, 74,
+        77, null, 76, null, 74, null, 71, null,
+        72, null, null, null, null, null, null, null,
+      ],
+      roots: [48, 45, 50, 43, 48, 45, 50, 43],
+      bass: [0, null, 7, null, 12, null, 7, null],
+      drums: 'k...s...',
+      hats: true,
+    },
 
     start(api) {
       const cells = Array(9).fill(null);
@@ -119,7 +138,7 @@
         cells[i] = turn;
         btns[i].textContent = MARK[turn];
         btns[i].classList.add('placed');
-        api.sound('tap');
+        api.sound(turn === 'O' ? 'placeO' : 'placeX');
 
         const w = winnerOf(cells);
         if (w) return finish(w);
@@ -132,6 +151,7 @@
       function maybeCpu() {
         if (mode === 'cpu' && turn === 'X' && !over) {
           busy = true;
+          api.timeout(() => api.sound('think'), 150);
           api.timeout(() => {
             busy = false;
             if (!over) play(aiMove(cells));
@@ -142,25 +162,30 @@
       function finish(w) {
         over = true;
         w.line.forEach((i) => btns[i].classList.add('win'));
-        let title, emoji;
+        let title, emoji, endSound;
         if (!w.p) {
           tally.D++;
           title = '비겼어요!';
           emoji = '🤝';
+          endSound = 'draw';
           status.textContent = '비겼어요!';
         } else {
           tally[w.p]++;
           if (mode === 'cpu') {
             title = w.p === 'O' ? '이겼어요! 🎉' : '컴퓨터가 이겼어요';
             emoji = w.p === 'O' ? '🥳' : '🤖';
+            endSound = w.p === 'O' ? 'win' : 'lose';
           } else {
             title = MARK[w.p] + ' 승리!';
             emoji = '🎉';
+            endSound = 'win';
           }
           status.textContent = title;
         }
         hud();
+        api.sound(!w.p ? 'tap' : (mode === 'cpu' && w.p === 'X') ? 'miss' : 'good'); // 한 줄 완성!
         api.timeout(() => api.end({
+          sound: endSound,
           title,
           emoji,
           text: MARK.O + ' ' + tally.O + ' : ' + tally.X + ' ' + MARK.X + '\n(무승부 ' + tally.D + '번)',

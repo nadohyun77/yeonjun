@@ -7,6 +7,25 @@ registerGame({
   howTo: '1부터 25까지 순서대로\n최대한 빠르게 터치해요.\n틀리면 1초가 더해져요!',
   best: 'low',
   format: (n) => n.toFixed(2) + '초',
+  // 빠르게 달리는 곡
+  music: {
+    bpm: 160,
+    lead: 'square',
+    melody: [
+      69, 72, 76, 72, 69, 72, 76, 79,
+      77, 76, 72, 69, 72, 76, 77, null,
+      79, 74, 71, 74, 79, 74, 71, 74,
+      76, null, 80, null, 83, null, 80, null,
+      81, 79, 76, 72, 76, 79, 81, 84,
+      77, 81, 84, 81, 77, 76, 72, null,
+      74, 79, 83, 79, 74, 71, 67, 71,
+      76, null, null, 80, 76, null, null, null,
+    ],
+    roots: [45, 41, 43, 40, 45, 41, 43, 40],
+    bass: [0, 0, 12, 0, 0, 0, 12, 0],
+    drums: 'k.s.kks.',
+    hats: true,
+  },
 
   start(api) {
     const N = 25;
@@ -32,7 +51,7 @@ registerGame({
         if (n === next) {
           if (!t0) t0 = performance.now();
           cell.classList.add('done');
-          api.sound('tap');
+          api.sound('note', n - 1); // 누를수록 음이 올라가요
           next++;
           if (next > N) {
             const t = Math.round(time() * 100) / 100;

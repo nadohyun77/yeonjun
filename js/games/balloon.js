@@ -7,6 +7,25 @@ registerGame({
   howTo: '30초 동안 올라오는 풍선을\n터치해서 터뜨려요.\n⭐ 황금 풍선은 3점!',
   best: 'high',
   format: (n) => n + '점',
+  // 통통 튀는 신나는 곡
+  music: {
+    bpm: 144,
+    lead: 'triangle',
+    melody: [
+      67, 72, 76, 72, 79, null, 76, null,
+      69, 72, 77, 72, 81, null, 77, null,
+      71, 74, 79, 74, 83, null, 79, 77,
+      76, null, 72, null, 72, null, null, null,
+      79, 81, 79, 76, 72, null, 76, 79,
+      81, 79, 77, 76, 77, null, 81, null,
+      79, 77, 76, 74, 71, null, 74, null,
+      72, 76, 79, 84, 72, null, null, null,
+    ],
+    roots: [48, 41, 43, 48, 48, 41, 43, 48],
+    bass: [0, null, 7, null, 12, null, 7, null],
+    drums: 'k.s.k.s.',
+    hats: true,
+  },
 
   start(api) {
     const stage = api.stage;
@@ -17,6 +36,7 @@ registerGame({
     let elapsed = 0;
     let spawnTimer = 0;
     let running = false;
+    let lastWarn = 0;
 
     const W = () => stage.clientWidth;
     const H = () => stage.clientHeight;
@@ -61,7 +81,7 @@ registerGame({
       b.dead = true;
       const pts = b.gold ? 3 : 1;
       score += pts;
-      api.sound(b.gold ? 'good' : 'pop');
+      api.sound(b.gold ? 'sparkle' : 'pop');
       api.vibrate(15);
       b.el.classList.add('popped');
       api.floatText('+' + pts, b.x + b.size / 2, b.y + b.size * 0.4, b.gold ? '#fde047' : '#ffffff');
@@ -84,6 +104,13 @@ registerGame({
           });
           return false;
         }
+        // 마지막 5초: 째깍 소리 + 음악 빨라짐
+        const left = Math.ceil(DURATION - elapsed);
+        if (left <= 5 && left !== lastWarn) {
+          lastWarn = left;
+          api.sound('warn');
+          api.musicTempo(1.25);
+        }
         const progress = Math.min(1, elapsed / DURATION);
         spawnTimer -= dt;
         if (spawnTimer <= 0) {
@@ -96,6 +123,7 @@ registerGame({
           b.y -= b.speed * dt;
           place(b, Math.sin(now / 500 + b.phase) * 12);
           if (b.y < -b.size * 1.6) {
+            api.sound('escape');
             b.el.remove();
             balloons.splice(i, 1);
           }

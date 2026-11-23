@@ -7,6 +7,26 @@ registerGame({
   howTo: '카드를 두 장씩 뒤집어서\n같은 그림 짝을 모두 찾아요.\n적은 횟수로 찾을수록 좋아요!',
   best: 'low',
   format: (n) => n + '번',
+  // 차분하게 생각하는 곡
+  music: {
+    bpm: 96,
+    lead: 'sine',
+    vol: 1.3,
+    melody: [
+      77, null, 72, null, 69, null, 72, null,
+      74, null, 69, null, 65, null, 69, null,
+      70, null, 74, null, 77, null, 74, 72,
+      72, null, null, null, 67, null, null, null,
+      77, null, 79, null, 81, null, 77, null,
+      74, null, 77, null, 81, null, 79, 77,
+      74, null, 72, null, 70, null, 74, null,
+      72, null, 67, null, 72, null, null, null,
+    ],
+    roots: [41, 38, 46, 48, 41, 38, 46, 48],
+    bass: [0, null, null, null, 7, null, null, null],
+    drums: 'k...k...',
+    hats: false,
+  },
 
   start(api) {
     const POOL = ['🐶', '🐱', '🐰', '🦊', '🐼', '🐸', '🐵', '🦁', '🐯', '🐨', '🐷', '🐙', '🦄', '🐢', '🐳', '🦋'];
@@ -43,7 +63,7 @@ registerGame({
       if (lock || card.classList.contains('flipped')) return;
       if (!t0) t0 = performance.now();
       card.classList.add('flipped');
-      api.sound('tap');
+      api.sound('flip');
 
       if (!first) { first = { card, sym }; return; }
 
@@ -68,6 +88,7 @@ registerGame({
       } else {
         lock = true;
         first = null;
+        api.timeout(() => api.sound('miss'), 350);
         api.timeout(() => {
           other.classList.remove('flipped');
           card.classList.remove('flipped');

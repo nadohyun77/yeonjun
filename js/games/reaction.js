@@ -7,6 +7,22 @@ registerGame({
   howTo: '화면이 초록색으로 바뀌면\n최대한 빨리 터치해요.\n5번 재서 평균을 내요.\n빨간색일 때 누르면 다시 해요!',
   best: 'low',
   format: (n) => n + 'ms',
+  // 두근두근 긴장되는 곡 (조용하게)
+  music: {
+    bpm: 92,
+    lead: 'sine',
+    vol: 0.8,
+    melody: [
+      74, null, null, null, null, null, null, null,
+      70, null, null, null, null, null, 69, null,
+      67, null, null, null, 70, null, null, null,
+      69, null, null, null, 73, null, null, null,
+    ],
+    roots: [50, 46, 43, 45],
+    bass: [0, null, null, null, 0, null, null, null],
+    drums: 'k.k.....',
+    hats: false,
+  },
 
   start(api) {
     const ROUNDS = 5;
@@ -64,7 +80,7 @@ registerGame({
         const ms = Math.round(now - goAt);
         results.push(ms);
         state = 'result';
-        api.sound('tap');
+        api.sound('ding', ms);
         if (results.length >= ROUNDS) {
           set('result', ms + 'ms', '');
           const avg = Math.round(results.reduce((a, b) => a + b, 0) / ROUNDS);
