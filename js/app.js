@@ -76,6 +76,162 @@
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* 무시 */ }
   }
 
+  // ---------- 배경음악 (직접 만든 곡을 브라우저가 연주) ----------
+  // 음 높이는 MIDI 번호 (60 = 도), null 은 쉼표. 한 칸 = 8분음표.
+  const TRACKS = {
+    menu: {
+      bpm: 116,
+      lead: 'triangle',
+      melody: [
+        72, null, 76, null, 79, null, 76, null,
+        69, null, 72, null, 76, null, 74, 72,
+        65, null, 69, null, 72, null, 74, null,
+        74, null, 71, null, 67, null, null, null,
+        72, null, 76, null, 79, null, 81, 79,
+        76, null, 72, null, 69, null, 72, null,
+        77, null, 76, null, 74, null, 72, null,
+        74, null, 71, 74, 72, null, null, null,
+      ],
+      roots: [48, 45, 41, 43, 48, 45, 41, 43],
+      bass: [0, null, 12, null, 0, null, 12, null],
+      drums: 'k.s.k.s.',
+      hats: true,
+    },
+    game: {
+      bpm: 150,
+      lead: 'square',
+      melody: [
+        72, 72, 79, 79, 81, 79, 76, null,
+        74, 74, 79, 79, 83, 79, 74, null,
+        76, null, 72, 76, 81, null, 79, 76,
+        77, 76, 74, 72, 74, null, 67, null,
+        72, 76, 79, 84, 79, 76, 72, null,
+        71, 74, 79, 83, 79, 74, 71, null,
+        69, 72, 76, 81, 79, 76, 72, 69,
+        65, 69, 72, 77, 74, 71, 67, null,
+      ],
+      roots: [48, 43, 45, 41, 48, 43, 45, 41],
+      bass: [0, 0, 12, 0, 0, 0, 12, 0],
+      drums: 'k.s.kks.',
+      hats: true,
+    },
+  };
+
+  const music = {
+    on: store.get('music', true),
+    want: null, // 'menu' | 'game'
+    track: null,
+    gain: null,
+    noise: null,
+    timer: null,
+    step: 0,
+    nextTime: 0,
+  };
+
+  const midiHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function musicOut(ac) {
+    if (!music.gain) {
+      music.gain = ac.createGain();
+      music.gain.gain.value = 0.55;
+      music.gain.connect(ac.destination);
+      const len = Math.floor(ac.sampleRate * 0.3);
+      music.noise = ac.createBuffer(1, len, ac.sampleRate);
+      const data = music.noise.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    return music.gain;
+  }
+
+  function synthNote(ac, out, freq, t, dur, type, vol) {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g).connect(out);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  }
+
+  function drum(ac, out, kind, t) {
+    if (kind === 'k') {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.frequency.setValueAtTime(140, t);
+      osc.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+      g.gain.setValueAtTime(0.35, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      osc.connect(g).connect(out);
+      osc.start(t);
+      osc.stop(t + 0.16);
+      return;
+    }
+    const src = ac.createBufferSource();
+    src.buffer = music.noise;
+    const filter = ac.createBiquadFilter();
+    const g = ac.createGain();
+    const isSnare = kind === 's';
+    filter.type = isSnare ? 'bandpass' : 'highpass';
+    filter.frequency.value = isSnare ? 1800 : 7000;
+    const dur = isSnare ? 0.12 : 0.04;
+    g.gain.setValueAtTime(isSnare ? 0.16 : 0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(filter).connect(g).connect(out);
+    src.start(t);
+    src.stop(t + dur + 0.01);
+  }
+
+  function scheduleStep(ac, out, tr, i, t, eighth) {
+    const note = tr.melody[i % tr.melody.length];
+    if (note !== null) synthNote(ac, out, midiHz(note), t, eighth * 0.9, tr.lead, tr.lead === 'square' ? 0.035 : 0.07);
+    const bar = Math.floor(i / 8) % tr.roots.length;
+    const b = tr.bass[i % 8];
+    if (b !== null) synthNote(ac, out, midiHz(tr.roots[bar] + b), t, eighth * 0.8, 'triangle', 0.12);
+    const d = tr.drums[i % 8];
+    if (d !== '.') drum(ac, out, d, t);
+    if (tr.hats) drum(ac, out, 'h', t + eighth / 2);
+  }
+
+  function musicTick() {
+    const ac = audioCtx;
+    if (!ac || ac.state !== 'running' || !music.track) return;
+    const tr = TRACKS[music.track];
+    const eighth = 60 / tr.bpm / 2;
+    const out = musicOut(ac);
+    if (music.nextTime < ac.currentTime) music.nextTime = ac.currentTime + 0.05;
+    while (music.nextTime < ac.currentTime + 0.25) {
+      scheduleStep(ac, out, tr, music.step, music.nextTime, eighth);
+      music.step++;
+      music.nextTime += eighth;
+    }
+  }
+
+  /** 원하는 곡을 정하고, 소리를 낼 수 있으면 바로 재생 */
+  function playMusic(name) {
+    music.want = name;
+    syncMusic();
+  }
+
+  function syncMusic() {
+    const target = music.on ? music.want : null;
+    if (!target) {
+      music.track = null;
+      if (music.timer) { clearInterval(music.timer); music.timer = null; }
+      return;
+    }
+    if (!audioCtx) return; // 첫 터치 전에는 소리를 낼 수 없음
+    if (music.track !== target) {
+      music.track = target;
+      music.step = 0;
+      music.nextTime = 0;
+    }
+    if (!music.timer) music.timer = setInterval(musicTick, 50);
+    musicTick();
+  }
+
   function shuffle(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -209,6 +365,7 @@
     stage.className = 'stage stage-' + game.id;
     el.stageWrap.appendChild(stage);
     session = { alive: true, timeouts: new Set(), intervals: new Set(), stage };
+    playMusic('game');
     game.start(makeApi(game, session));
   }
 
@@ -269,6 +426,7 @@
     el.stageWrap.innerHTML = '';
     renderHome();
     showScreen('home');
+    playMusic('menu');
   }
 
   function renderHome() {
@@ -329,12 +487,38 @@
 
   function updateSoundButton() {
     el.soundBtn.textContent = soundOn ? '🔊' : '🔇';
+    el.musicBtn.classList.toggle('off', !music.on);
+    el.musicBtn.setAttribute('aria-label', music.on ? '배경음악 끄기' : '배경음악 켜기');
+  }
+
+  function setupMusic() {
+    el.musicBtn.addEventListener('click', () => {
+      music.on = !music.on;
+      store.set('music', music.on);
+      updateSoundButton();
+      getAudio();
+      syncMusic();
+    });
+
+    // 브라우저는 화면을 한 번 터치해야 소리를 낼 수 있게 해 줌
+    const unlock = () => { getAudio(); syncMusic(); };
+    document.addEventListener('pointerdown', unlock, true);
+
+    // 다른 앱으로 가거나 화면이 꺼지면 음악 멈춤
+    document.addEventListener('visibilitychange', () => {
+      if (!audioCtx) return;
+      if (document.hidden) audioCtx.suspend();
+      else audioCtx.resume().then(syncMusic);
+    });
+
+    playMusic('menu');
   }
 
   function init() {
     el = {
       list: $('game-list'),
       soundBtn: $('sound-toggle'),
+      musicBtn: $('music-toggle'),
       backBtn: $('back-btn'),
       hudTitle: $('hud-title'),
       hudInfo: $('hud-info'),
@@ -362,6 +546,7 @@
     document.addEventListener('contextmenu', (e) => e.preventDefault());
 
     updateSoundButton();
+    setupMusic();
     setupFullscreen();
     renderHome();
 
