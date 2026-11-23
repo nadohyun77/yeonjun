@@ -317,10 +317,9 @@
   }
 
   function setupFullscreen() {
-    // 이미 홈 화면 앱(전체 화면)으로 실행 중이거나 지원하지 않는 브라우저면 버튼 숨김
-    const standalone = window.matchMedia && window.matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+    // 전체 화면을 지원하지 않는 브라우저(예: 아이폰)에서만 버튼 숨김
     document.querySelectorAll('.fs-btn').forEach((b) => {
-      if (!fsSupported || standalone) { b.hidden = true; return; }
+      if (!fsSupported) { b.hidden = true; return; }
       b.addEventListener('click', () => { sound('tap'); toggleFullscreen(); });
     });
     document.addEventListener('fullscreenchange', updateFullscreenButtons);
@@ -367,6 +366,14 @@
     renderHome();
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      // 새 버전이 설치되면 게임 중이 아닐 때 한 번 새로고침해서 바로 반영
+      const hadController = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController || reloaded) return;
+        reloaded = true;
+        if (!session) location.reload();
+      });
       navigator.serviceWorker.register('sw.js').catch(() => { /* 오프라인 기능 없이 계속 */ });
     }
   }

@@ -1,6 +1,6 @@
 // 오프라인에서도 게임을 할 수 있도록 파일을 저장해 둡니다.
 // 게임 파일을 바꾸면 CACHE 버전을 올려 주세요.
-const CACHE = 'minigames-v2';
+const CACHE = 'minigames-v3';
 const ASSETS = [
   './',
   'index.html',
@@ -19,7 +19,12 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
+  // 브라우저 캐시를 건너뛰고 항상 최신 파일을 받아 저장
+  event.waitUntil(
+    caches.open(CACHE).then((cache) =>
+      cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })))
+    )
+  );
   self.skipWaiting();
 });
 
@@ -31,21 +36,19 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 저장된 파일을 먼저 보여 주고, 뒤에서 새 버전으로 갱신합니다.
+// 인터넷이 되면 항상 최신 파일을, 안 되면 저장된 파일을 보여 줍니다.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   event.respondWith(
-    caches.open(CACHE).then((cache) =>
-      cache.match(req).then((cached) => {
-        const network = fetch(req)
-          .then((res) => {
-            if (res.ok) cache.put(req, res.clone());
-            return res;
-          })
-          .catch(() => cached);
-        return cached || network;
+    fetch(req, { cache: 'no-cache' })
+      .then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(req, copy));
+        }
+        return res;
       })
-    )
+      .catch(() => caches.match(req, { ignoreSearch: true }))
   );
 });
